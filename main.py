@@ -1,18 +1,15 @@
 #!/usr/bin/env python
-import requests
 import os
 import logging
-import statistics
 import math
 import argparse
 import svg_stack as ss
 from glob import glob
 from boardgamegeek import BGGClient
 import boardgamegeek as bggm
-from types import SimpleNamespace
 import xml.etree.ElementTree as xmlET
 import cairosvg
-from PIL import ImageFont, ImageDraw, Image
+from PIL import ImageFont
 from pypdf import PdfMerger
 
 logging.basicConfig(level=logging.INFO)
@@ -26,16 +23,6 @@ SVG_TEMPLATE = "label_template.svg"
 BUILDDIR = 'build'
 
 bgg = BGGClient(cache=bggm.CacheBackendSqlite(path="cache/cache.db", ttl=-1))
-
-def get_median_time(id):
-    plays = bgg.plays(game_id=id)
-    plays = [p for p in plays if p.duration > 0]
-    n_plays = sum(p.quantity if p.quantity > 0 else 1 for p in plays)
-    duration = sum(p.duration for p in plays)
-    LOGGER.debug(f"playsession #: {len(plays)}")
-    LOGGER.debug(f"play #: {n_plays}")
-    play_times = [p.duration / (p.quantity if p.quantity else 1) for p in plays]
-    return statistics.median(play_times)
 
 def game_info(game, max_tag_len=30):
     """
@@ -72,13 +59,11 @@ def game_info(game, max_tag_len=30):
         if rankinfo.value is not None and rankinfo.value < best_rank:
             best_rank = rankinfo.value
             best_rank_name = rankinfo.name
-        # if rankinfo['id'] == '1':
-        #     rank = rankinfo['value']
-        #     break
     rank_cutoffs = (1, 5, 10, 20, 50, 100, 200, 1000, math.inf)
     rank_class = min([r for r in rank_cutoffs if best_rank <= r])
+    best_rank_name = best_rank_name.replace('games','').replace('boardgame','all time')
     if rank_class != math.inf:
-        res['award'] = f"Top {rank_class} {best_rank_name.replace('games','').replace('boardgame','all time')}"
+        res['award'] = f"Top {rank_class} {best_rank_name}"
     res['rank'] = game.bgg_rank
     res['tags'] = game.categories
     short_tags = ''
@@ -89,7 +74,6 @@ def game_info(game, max_tag_len=30):
             else:
                 short_tags += ', ' + t
     res['short_tags'] = short_tags
-    # res.median_time = get_median_time(game.id)
     return res
 
 def set_content(tree, xpath, content, ns):
@@ -128,7 +112,8 @@ def fill_template(game, svg_file=SVG_TEMPLATE):
             elif svg_name == 'name':
                 width = font.getlength(value)
                 if width > MAX_LINELENGHT:
-                    clear_content(root, span_xpath % ('name-group', 'name-text-short'), ns)
+                    clear_content(
+                        root, span_xpath % ('name-group', 'name-text-short'), ns)
                     line1 = value.split()
                     line2 = []
                     while font.getlength(' '.join(line1)) > MAX_LINELENGHT:
@@ -142,18 +127,20 @@ def fill_template(game, svg_file=SVG_TEMPLATE):
                     line1 = ' '.join(line1)
                     line2 = ' '.join(line2)
                     set_content(root, 
-                                span_xpath % (f'name-group', f'name-text-line1'), 
+                                span_xpath % ('name-group', 'name-text-line1'), 
                                 line1,
                                 ns)
                     set_content(root, 
-                                span_xpath % (f'name-group', f'name-text-line2'), 
+                                span_xpath % ('name-group', 'name-text-line2'), 
                                 line2,
                                 ns)
                 else:
-                    clear_content(root, span_xpath % ('name-group', 'name-text-line1'), ns)
-                    clear_content(root, span_xpath % ('name-group', 'name-text-line2'), ns)
+                    clear_content(
+                        root, span_xpath % ('name-group', 'name-text-line1'), ns)
+                    clear_content(
+                        root, span_xpath % ('name-group', 'name-text-line2'), ns)
                     set_content(root, 
-                                span_xpath % (f'name-group', f'name-text-short'), 
+                                span_xpath % ('name-group', 'name-text-short'), 
                                 value,
                                 ns)
             else:
@@ -162,7 +149,8 @@ def fill_template(game, svg_file=SVG_TEMPLATE):
                             value,
                             ns)
         except AttributeError as e:
-            print(f"Could not find {svg_name}-group/{svg_name}-text. Is your SVG file correct?")
+            not_found = "{svg_name}-group/{svg_name}-text"
+            print(f"Could not find {not_found}. Is your SVG file correct?")
             raise e
     return tree
     
@@ -187,7 +175,9 @@ def join_pdf(files):
 def export(files):
     out_files = []
     for in_file in files:
-        out_file = os.path.dirname(in_file) + '/' + os.path.basename(os.path.splitext(in_file)[0]) + '.pdf'
+        in_path = os.path.dirname(in_file) 
+        in_basename = os.path.basename(os.path.splitext(in_file)[0]) 
+        out_file = in_path + '/' + in_basename + '.pdf'
         cairosvg.svg2pdf(file_obj=open(in_file, "rb"), write_to=out_file)
         out_files.append(out_file)
     return out_files
@@ -244,7 +234,7 @@ def main():
     parser.add_argument('--no-pdf', action="store_false",
                         help="Do not produce a final PDF, just SVG pages")
     parser.add_argument('--no-svg-pages', action="store_false",
-                        help="Do not produce a PDF or SVG pages, just individual labels")
+                        help="Do not output a PDF or SVG pages, just labels")
     args = parser.parse_args()
 
     print(args.username)
@@ -257,7 +247,7 @@ def main():
         os.mkdir(f'{BUILDDIR}/pages')
 
     game_collection = get_game_collection(args.username)
-    svgs = write_svg(game_collection)
+    write_svg(game_collection)
     svg_pages = compose_all(glob(f'{BUILDDIR}/games/*.svg'), 6, 3)
     out_pdfs = export(svg_pages)
     join_pdf(out_pdfs)
