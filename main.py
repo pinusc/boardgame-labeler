@@ -4,6 +4,7 @@ import os
 import logging
 import statistics
 import math
+import argparse
 import svg_stack as ss
 from glob import glob
 from boardgamegeek import BGGClient
@@ -204,12 +205,14 @@ def compose_all(files, rows, cols):
         page_files.append(out_file)
     return page_files
 
-def write_svg(): 
-    print(f"Getting game collection for {USERNAME}...")
+def get_game_collection(username):
+    print(f"Getting game collection for {username}...")
     game_collection = bgg.collection(
-        USERNAME,
+        username,
         exclude_subtype='boardgameexpansion')
-        # exclude_subtype=)
+    return game_collection
+
+def write_svg(game_collection): 
     game_ids = [game.id for game in game_collection.items]
 
     out_paths = []
@@ -226,14 +229,38 @@ def write_svg():
 
     # tree.write('svg-out.svg')
 
-if __name__ == "__main__":
+
+def main():
+    parser = argparse.ArgumentParser(
+                    prog='Boardgame Collection Labeler',
+                    description='What the program does',
+                    epilog='Text at the bottom of help')
+
+    parser.add_argument('username', 
+                        help="BGG username whose collection to get")
+    parser.add_argument('-c', '--columns', default=3)
+    parser.add_argument('-r', '--rows', default=6)
+    parser.add_argument('-o', '--out', default="labels.pdf")
+    parser.add_argument('--no-pdf', action="store_false",
+                        help="Do not produce a final PDF, just SVG pages")
+    parser.add_argument('--no-svg-pages', action="store_false",
+                        help="Do not produce a PDF or SVG pages, just individual labels")
+    args = parser.parse_args()
+
+    print(args.username)
+
     if not os.path.isdir(BUILDDIR):
         os.mkdir(BUILDDIR)
     if not os.path.isdir(f'{BUILDDIR}/games'):
         os.mkdir(f'{BUILDDIR}/games')
     if not os.path.isdir(f'{BUILDDIR}/pages'):
         os.mkdir(f'{BUILDDIR}/pages')
-    svgs = write_svg()
+
+    game_collection = get_game_collection(args.username)
+    svgs = write_svg(game_collection)
     svg_pages = compose_all(glob(f'{BUILDDIR}/games/*.svg'), 6, 3)
     out_pdfs = export(svg_pages)
     join_pdf(out_pdfs)
+
+if __name__ == "__main__":
+    main()
