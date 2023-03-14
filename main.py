@@ -24,7 +24,14 @@ TEST_ID = 285967
 SVG_TEMPLATE = "label_template.svg"
 BUILDDIR = 'build'
 
-bgg = BGGClient(cache=bggm.CacheBackendSqlite(path="cache/cache.db", ttl=-1))
+COLOR_GREEN = '#008000'
+COLOR_YELLOW = '#ca9a08'
+COLOR_ORANGE = '#e27a07'
+COLOR_RED = '#bb0707'
+
+NOT_RECOMMENDED_TRESHOLD = 0.7
+
+bgg = BGGClient(cache=bggm.CacheBackendSqlite(path="cache/cache.db", ttl=3600))
 
 def game_info(game, max_tag_len=30):
     """
@@ -35,7 +42,30 @@ def game_info(game, max_tag_len=30):
     res['name'] = game.name
     res['id'] = game.id
     res['year'] = game.year
-    res['weight'] = game.rating_average_weight
+    weight = game.rating_average_weight
+    res['weight'] = weight
+    weight_label = ''
+    weight_color = ''
+    if weight <= 2:
+        weight_label = 'Very Light'
+        weight_color = COLOR_GREEN
+    elif 2 < weight <= 2.8:
+        weight_label = 'Light'
+        weight_color = COLOR_GREEN
+    elif 2.8 < weight <= 3.2:
+        weight_label = 'Medium-Light'
+        weight_color = COLOR_YELLOW
+    elif 3.2 < weight <= 3.7:
+        weight_label = 'Medium'
+        weight_color = COLOR_ORANGE
+    elif 3.7 < weight <= 4:
+        weight_label = 'Medium-Heavy'
+        weight_color = COLOR_ORANGE
+    elif weight > 4:
+        weight_label = 'Heavy'
+        weight_color = COLOR_RED
+    res['weight_label'] = f'{weight_label} ({game.rating_average_weight:.1f})'
+    res['weight_color'] = weight_color
     minplayers = data['minplayers']
     maxplayers = data['maxplayers']
     if minplayers == maxplayers:
@@ -75,10 +105,41 @@ def game_info(game, max_tag_len=30):
             else:
                 short_tags += ', ' + t
     res['short_tags'] = short_tags
+
+    not_recommended = []
+    for ps in game.player_suggestions:
+        d = ps.data()
+        n = ps.numeric_player_count
+        total = d['best'] + d['recommended'] + d['not_recommended']
+        really_not_rec = NOT_RECOMMENDED_TRESHOLD < d['not_recommended'] / total
+        within_count = game.min_players <= n <= game.max_players
+        if really_not_rec and within_count:
+            not_recommended.append(n)
+
+    res['not_recommended'] = not_recommended
+    if not_recommended:
+        not_recommended.sort()
+        not_recommended_ranges = [(not_recommended.pop(0),)]
+        for n in not_recommended:
+            last_range = not_recommended_ranges[-1]
+            if n == 1 + last_range[-1]:
+                not_recommended_ranges[-1] = (last_range[0], n)
+            else:
+                not_recommended_ranges.append((n,))
+        not_recommended_str = ''
+        for i, r in enumerate(not_recommended_ranges):
+            if len(r) == 1:
+                not_recommended_str += f'{r[0]}'
+            else:
+                not_recommended_str += f'{r[0]}-{r[1]}'
+            if i < len(not_recommended_ranges) - 1:
+                not_recommended_str += ','
+        res['not_recommended_str'] = not_recommended_str
+
     return res
 
 def set_content(tree, xpath, content, ns):
-    element = tree.find(xpath, ns)
+    element = tree.findall(xpath, ns)[-1]
     element.text = str(content)
 
 def clear_content(tree, xpath, ns):
@@ -89,7 +150,7 @@ def clear_content(tree, xpath, ns):
 ns = {'inkscape': "http://www.inkscape.org/namespaces/inkscape"}
 label_xpath = "[@inkscape:label='%s']"
 group_xpath = f".//*{label_xpath}/"
-span_xpath = f".//*{label_xpath}/*{label_xpath}/{{*}}tspan"
+span_xpath = f".//*{label_xpath}/*{label_xpath}//{{*}}tspan"
 font = ImageFont.truetype("res/Roboto-Bold.ttf", 24)
 MAX_LINELENGHT = 260 # px
 
@@ -155,8 +216,10 @@ def fill_template(game, svg_file=SVG_TEMPLATE):
     root = tree.getroot()
     attr_dict = {
         'name': 'name', 
-        'weight': 'weight',
+        'weight': 'weight_label',
         'player-n': 'player_range',
+        'weight_color': 'weight_color',
+        'recommended-n': 'not_recommended_str',
         'time': 'time_range',
         'avgscore': 'rating',
         'rank': 'award',
@@ -166,9 +229,14 @@ def fill_template(game, svg_file=SVG_TEMPLATE):
         value = game.get(bg_attr)
         if type(value) == float:
             value = '%.1f' % value
+        if svg_name == 'recommended-n' and value:
+            value += ')'
         try:
             if value is None:
                 clear_content(root, group_xpath % f'{svg_name}-group', ns)
+            elif svg_name == 'weight_color':
+                weight_bg_rect = tree.find((group_xpath % 'weight-group') + '/{*}rect', ns)
+                weight_bg_rect.attrib['style'] = f'fill:{value};'
             else:
                 fill_text(root, svg_name, value)
         except AttributeError as e:
