@@ -3,8 +3,10 @@ import os
 import logging
 import math
 import argparse
+from tkinter import ttk
 import svg_stack as ss
 from glob import glob
+from datetime import datetime
 from boardgamegeek import BGGClient
 import boardgamegeek as bggm
 import xml.etree.ElementTree as xmlET
@@ -30,7 +32,6 @@ def game_info(game, max_tag_len=30):
     """
     res = {}
     data = game.data()
-    __import__('pdb').set_trace()
     res['name'] = game.name
     res['id'] = game.id
     res['year'] = game.year
@@ -84,13 +85,74 @@ def clear_content(tree, xpath, ns):
     element = tree.find(xpath, ns)
     element.clear()
 
+
+ns = {'inkscape': "http://www.inkscape.org/namespaces/inkscape"}
+label_xpath = "[@inkscape:label='%s']"
+group_xpath = f".//*{label_xpath}/"
+span_xpath = f".//*{label_xpath}/*{label_xpath}/{{*}}tspan"
+font = ImageFont.truetype("res/Roboto-Bold.ttf", 24)
+MAX_LINELENGHT = 260 # px
+
+def fill_multi_line(tree, property, value):
+    clear_content(
+        tree, span_xpath % (f'{property}-group', f'{property}-text-short'), ns)
+    line1 = value.split()
+    line2 = []
+    while font.getlength(' '.join(line1)) > MAX_LINELENGHT:
+        line2 = [line1.pop()] + line2
+    popped = False
+    while font.getlength(' '.join(line2) + '...') > MAX_LINELENGHT:
+        popped = True
+        line2.pop()
+    if popped:
+        line2.append('...')
+    line1 = ' '.join(line1)
+    line2 = ' '.join(line2)
+    set_content(tree, 
+                span_xpath % (f'{property}-group', f'{property}-text-line1'), 
+                line1,
+                ns)
+    set_content(tree, 
+                span_xpath % (f'{property}-group', f'{property}-text-line2'), 
+                line2,
+                ns)
+
+def fill_text(tree, property, value):
+    multiline_supported = ['name']
+    if property in multiline_supported:
+        width = font.getlength(value)
+        if width > MAX_LINELENGHT:
+            fill_multi_line(tree, property, value)
+        else:
+            # delete line1 and line2
+            clear_content(
+                tree, span_xpath % (f'{property}-group', f'{property}-text-line1'), ns)
+            clear_content(
+                tree, span_xpath % (f'{property}-group', f'{property}-text-line2'), ns)
+            set_content(tree, 
+                        span_xpath % (f'{property}-group', f'{property}-text-short'), 
+                        value,
+                        ns)
+    elif property == 'rank':
+        _, top_n, *category = value.split(' ')
+        category = ' '.join(category)
+        set_content(tree, 
+                    span_xpath % (f'{property}-group', f'{property}-text-line1'), 
+                    "Top " + top_n,
+                    ns)
+        set_content(tree, 
+                    span_xpath % (f'{property}-group', f'{property}-text-line2'), 
+                    category,
+                    ns)
+    else:
+        set_content(tree, 
+                    span_xpath % (f'{property}-group', f'{property}-text'), 
+                    value,
+                    ns)
+
 def fill_template(game, svg_file=SVG_TEMPLATE):
-    ns = {'inkscape': "http://www.inkscape.org/namespaces/inkscape"}
     tree = xmlET.parse(svg_file)
     root = tree.getroot()
-    label_xpath = "[@inkscape:label='%s']"
-    group_xpath = f".//*{label_xpath}/"
-    span_xpath = f".//*{label_xpath}/*{label_xpath}/{{*}}tspan"
     attr_dict = {
         'name': 'name', 
         'weight': 'weight',
@@ -100,8 +162,6 @@ def fill_template(game, svg_file=SVG_TEMPLATE):
         'rank': 'award',
         'tags': 'short_tags'
     }
-    font = ImageFont.truetype("res/Roboto-Bold.ttf", 24)
-    MAX_LINELENGHT = 260 # px
     for svg_name, bg_attr in attr_dict.items():
         value = game.get(bg_attr)
         if type(value) == float:
@@ -109,47 +169,10 @@ def fill_template(game, svg_file=SVG_TEMPLATE):
         try:
             if value is None:
                 clear_content(root, group_xpath % f'{svg_name}-group', ns)
-            elif svg_name == 'name':
-                width = font.getlength(value)
-                if width > MAX_LINELENGHT:
-                    clear_content(
-                        root, span_xpath % ('name-group', 'name-text-short'), ns)
-                    line1 = value.split()
-                    line2 = []
-                    while font.getlength(' '.join(line1)) > MAX_LINELENGHT:
-                        line2 = [line1.pop()] + line2
-                    popped = False
-                    while font.getlength(' '.join(line2) + '...') > MAX_LINELENGHT:
-                        popped = True
-                        line2.pop()
-                    if popped:
-                        line2.append('...')
-                    line1 = ' '.join(line1)
-                    line2 = ' '.join(line2)
-                    set_content(root, 
-                                span_xpath % ('name-group', 'name-text-line1'), 
-                                line1,
-                                ns)
-                    set_content(root, 
-                                span_xpath % ('name-group', 'name-text-line2'), 
-                                line2,
-                                ns)
-                else:
-                    clear_content(
-                        root, span_xpath % ('name-group', 'name-text-line1'), ns)
-                    clear_content(
-                        root, span_xpath % ('name-group', 'name-text-line2'), ns)
-                    set_content(root, 
-                                span_xpath % ('name-group', 'name-text-short'), 
-                                value,
-                                ns)
             else:
-                set_content(root, 
-                            span_xpath % (f'{svg_name}-group', f'{svg_name}-text'), 
-                            value,
-                            ns)
+                fill_text(root, svg_name, value)
         except AttributeError as e:
-            not_found = "{svg_name}-group/{svg_name}-text"
+            not_found = f"{svg_name}-group/{svg_name}-text"
             print(f"Could not find {not_found}. Is your SVG file correct?")
             raise e
     return tree
@@ -202,8 +225,7 @@ def get_game_collection(username):
         exclude_subtype='boardgameexpansion')
     return game_collection
 
-def write_svg(game_collection): 
-    game_ids = [game.id for game in game_collection.items]
+def write_svg(game_ids): 
 
     out_paths = []
     for id in game_ids:
@@ -218,6 +240,9 @@ def write_svg(game_collection):
     return out_paths
 
     # tree.write('svg-out.svg')
+
+def the_gui():
+    pass
 
 
 def main():
@@ -235,6 +260,13 @@ def main():
                         help="Do not produce a final PDF, just SVG pages")
     parser.add_argument('--no-svg-pages', action="store_false",
                         help="Do not output a PDF or SVG pages, just labels")
+    parser.add_argument('--since',
+                        metavar='date',
+                        type=lambda x: datetime.fromisoformat(x).date(),
+                        help="Only consider boardgames added after this date")
+    parser.add_argument('--bgg-id',
+                        type=int,
+                        help="Generate label only for this ID")
     args = parser.parse_args()
 
     print(args.username)
@@ -246,8 +278,17 @@ def main():
     if not os.path.isdir(f'{BUILDDIR}/pages'):
         os.mkdir(f'{BUILDDIR}/pages')
 
-    game_collection = get_game_collection(args.username)
-    write_svg(game_collection)
+    if args.bgg_id:
+        game_ids = [args.bgg_id]
+    else:
+        game_collection = get_game_collection(args.username)
+        games = game_collection.items
+        print(f"From {len(games)}")
+        if args.since:
+            games = [g for g in games if datetime.fromisoformat(g.last_modified).date() > args.since]
+        print(f"Got {len(games)}")
+        game_ids = [game.id for game in games]
+    write_svg(game_ids)
     svg_pages = compose_all(glob(f'{BUILDDIR}/games/*.svg'), 6, 3)
     out_pdfs = export(svg_pages)
     join_pdf(out_pdfs)
