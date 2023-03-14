@@ -149,7 +149,7 @@ def clear_content(tree, xpath, ns):
 
 ns = {'inkscape': "http://www.inkscape.org/namespaces/inkscape"}
 label_xpath = "[@inkscape:label='%s']"
-group_xpath = f".//*{label_xpath}/"
+group_xpath = f".//*{label_xpath}"
 span_xpath = f".//*{label_xpath}/*{label_xpath}//{{*}}tspan"
 font = ImageFont.truetype("res/Roboto-Bold.ttf", 24)
 MAX_LINELENGHT = 260 # px
@@ -231,11 +231,14 @@ def fill_template(game, svg_file=SVG_TEMPLATE):
             value = '%.1f' % value
         if svg_name == 'recommended-n' and value:
             value += ')'
+        if type(value) == str:
+            value = value.replace(' - ', '–')
+            value = value.replace('-', '–')
         try:
             if value is None:
                 clear_content(root, group_xpath % f'{svg_name}-group', ns)
             elif svg_name == 'weight_color':
-                weight_bg_rect = tree.find((group_xpath % 'weight-group') + '/{*}rect', ns)
+                weight_bg_rect = tree.find((group_xpath % 'weight-group') + '{*}rect', ns)
                 weight_bg_rect.attrib['style'] = f'fill:{value};'
             else:
                 fill_text(root, svg_name, value)
