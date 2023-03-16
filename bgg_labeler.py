@@ -23,8 +23,8 @@ logging.getLogger("boardgamegeek.api").setLevel(logging.INFO)
 USERNAME="ColbyBoardgames"
 TEST_ID = 285967
 base_path = Path(getattr(sys, '_MEIPASS', os.getcwd()))
-SVG_TEMPLATE = base_path / "label_template.svg"
 RESDIR = base_path / 'res'
+SVG_TEMPLATE = RESDIR / "label_template.svg"
 BUILDDIR = Path('build')
 CACHEDIR = Path('cache')
 
