@@ -153,13 +153,17 @@ def fill_truncate_text(tree, property, value):
     max_length_string = tree.find(xpath, ns).text
     max_linelength = font.getlength(max_length_string)
 
-    value = value.split(' ')
+    if ', ' in value:
+        value = value.split(', ')
+    elif ',' in value:
+        value = value.split(',')
+    else:
+        value = value.split(' ')
 
     while font.getlength(' '.join(value)) > max_linelength:
         value.pop()
 
-    value = ' '.join(value)
-    value.strip(' ,')
+    value = ', '.join(value)
     set_content(tree, xpath, value, ns)
     
 
@@ -248,6 +252,7 @@ def fill_template(game, svg_file=SVG_TEMPLATE):
         if type(value) == str:
             value = value.replace(' - ', '–')
             value = value.replace('-', '–')
+            value = value.replace(' / ', '/')
         try:
             if value is None:
                 clear_content(root, group_xpath % f'{svg_name}-group', ns)
@@ -338,7 +343,7 @@ def run(args):
         game_collection = get_game_collection(args.username)
         collection_games = game_collection.items
         if args.since:
-            collection_games = [g for g in collection_games if datetime.fromisoformat(g.last_modified).date() > args.since]
+            collection_games = [g for g in collection_games if datetime.fromisoformat(g.last_modified).date() >= args.since]
         game_ids = [game.id for game in collection_games]
 
     print("Getting game information from BGG...")
