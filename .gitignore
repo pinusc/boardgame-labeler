@@ -33,10 +33,12 @@ MANIFEST
 .scrapy
 
 # Environments
+.direnv
 .env
 .venv
 env/
 venv/
+wenv/
 ENV/
 env.bak/
 venv.bak/

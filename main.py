@@ -16,7 +16,8 @@ def main():
                     epilog='Text at the bottom of help')
 
     parser.add_argument('username', 
-                        help="BGG username whose collection to get",)
+                        help="BGG username whose collection to get",
+                        nargs='?')
     parser.add_argument('--gui', action=GuiAction, nargs=0)
     parser.add_argument('-c', '--columns', default=3)
     parser.add_argument('-r', '--rows', default=6)
@@ -34,15 +35,10 @@ def main():
                         type=int,
                         help="Generate label only for this ID")
     args = parser.parse_args()
-    cli = not args.gui
-    if cli and not args.username:
-        print(args.help)
-        print('The argument "username" is required.')
-        sys.exit(1)
-    if args.gui:
-        start_gui()
-    else:
+    if args.username:
         run(args)
+    else:
+        start_gui(args)
 
 if __name__ == "__main__":
     main()
