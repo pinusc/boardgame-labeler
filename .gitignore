@@ -42,3 +42,5 @@ wenv/
 ENV/
 env.bak/
 venv.bak/
+
+pyinstaller

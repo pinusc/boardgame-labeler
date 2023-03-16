@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "boardgame_labeler"}]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = ">=3.8,<3.12"
 tqdm = "^4.65.0"
 boardgamegeek2 = {git = "https://github.com/Conday/boardgamegeek.git"}
 svglib = "^1.5.1"
@@ -15,6 +15,9 @@ pypdf = "^3.5.2"
 reportlab = "^3.6.12"
 svg-stack = "^0.1.0"
 
+
+[tool.poetry.group.dev.dependencies]
+pyinstaller = "^5.9.0"
 
 [build-system]
 requires = ["poetry-core"]
