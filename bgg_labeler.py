@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from svglib.svglib import svg2rlg
 import svglib as svglib
@@ -21,10 +22,11 @@ logging.getLogger("boardgamegeek.api").setLevel(logging.INFO)
 
 USERNAME="ColbyBoardgames"
 TEST_ID = 285967
-SVG_TEMPLATE = "label_template.svg"
+base_path = Path(getattr(sys, '_MEIPASS', os.getcwd()))
+SVG_TEMPLATE = base_path / "label_template.svg"
+RESDIR = base_path / 'res'
 BUILDDIR = Path('build')
 CACHEDIR = Path('cache')
-RESDIR = Path('res')
 
 COLOR_GREEN = '#008000'
 COLOR_YELLOW = '#ca9a08'
