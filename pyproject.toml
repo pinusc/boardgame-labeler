@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "boardgame-labeler"
+version = "0.1.0"
+description = ""
+authors = ["Giuseppe Stelluto <giuseppe@gstelluto.com>"]
+readme = "README.md"
+packages = [{include = "boardgame_labeler"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+tqdm = "^4.65.0"
+boardgamegeek2 = {git = "https://github.com/Conday/boardgamegeek.git"}
+svglib = "^1.5.1"
+pypdf = "^3.5.2"
+reportlab = "^3.6.12"
+svg-stack = "^0.1.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
