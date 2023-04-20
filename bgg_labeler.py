@@ -14,6 +14,9 @@ import boardgamegeek as bggm
 import xml.etree.ElementTree as xmlET
 from PIL import ImageFont
 from pypdf import PdfMerger
+import platformdirs
+
+APPNAME = 'BGGLabeler'
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger('main')
@@ -22,11 +25,6 @@ logging.getLogger("boardgamegeek.api").setLevel(logging.INFO)
 
 USERNAME="ColbyBoardgames"
 TEST_ID = 285967
-base_path = Path(getattr(sys, '_MEIPASS', os.getcwd()))
-RESDIR = base_path / 'res'
-SVG_TEMPLATE = RESDIR / "label_template.svg"
-BUILDDIR = Path('build')
-CACHEDIR = Path('cache')
 
 COLOR_GREEN = '#008000'
 COLOR_YELLOW = '#ca9a08'
@@ -35,7 +33,23 @@ COLOR_RED = '#bb0707'
 
 NOT_RECOMMENDED_TRESHOLD = 0.7
 
+def directories():
+    builddir = Path(platformdirs.user_runtime_dir(APPNAME))
+    cachedir = Path(platformdirs.user_cache_dir(APPNAME))
+    appdir = Path(getattr(sys, '_MEIPASS', os.getcwd()))
+    resdir = appdir / 'res'
+    for d in (builddir, cachedir, appdir, resdir):
+        if not os.path.isdir(d):
+            os.makedirs(d)
+    return builddir, cachedir, resdir, appdir
+
+BUILDDIR, CACHEDIR, RESDIR, APPDIR = directories()
 bgg = BGGClient(cache=bggm.CacheBackendSqlite(path=CACHEDIR / "cache.db", ttl=3600))
+# APPDIR relates to the package's internal (virtual) app structure.
+# RESDIR (child of APPDIR) includes files necessary for running the program, such as fonts
+# and the default SVG template
+# It never needs to be accessed by the user
+SVG_TEMPLATE = RESDIR / "label_template.svg"
 
 def game_info(game):
     """
@@ -333,7 +347,7 @@ def write_svg(game, overwrite=False):
 
 def run(args):
     if not os.path.isdir(BUILDDIR):
-        os.mkdir(BUILDDIR)
+        os.makedirs(BUILDDIR)
     if not os.path.isdir(BUILDDIR / 'games'):
         os.mkdir(BUILDDIR / 'games')
     if not os.path.isdir(BUILDDIR / 'pages'):
