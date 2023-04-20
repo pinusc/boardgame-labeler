@@ -161,7 +161,7 @@ ns = {'inkscape': "http://www.inkscape.org/namespaces/inkscape"}
 label_xpath = "[@inkscape:label='%s']"
 group_xpath = f".//*{label_xpath}"
 span_xpath = f".//*{label_xpath}/*{label_xpath}//{{*}}tspan"
-font = ImageFont.truetype((RESDIR / "Roboto-Bold.ttf").resolve(), 24)
+font = ImageFont.truetype(str(RESDIR / "Roboto-Bold.ttf"), 24)
 MAX_LINELENGHT = 260 # px
 
 def fill_truncate_text(tree, property, value):
